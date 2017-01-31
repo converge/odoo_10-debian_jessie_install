@@ -1,0 +1,163 @@
+Instalação para Debian Jessie
+
+
+# Pacotes necessários:
+sudo apt-get install python-pip postgresql postgresql-server-dev-9.4 libxml2-dev python-dev libxslt1-dev libldap2-dev libsasl2-dev npm git nodejs nodejs-legacy node-less
+
+# Atualizar o PIP
+sudo pip install --upgrade pip
+
+# criar usuário do banco de dados e criar role
+sudo su - postgres
+createuser odoo --interactive # (y)
+psql template1
+alter role odoo with password 'senha_nova';
+
+# criar usuário no linux
+sudo adduser --system --home=/opt/odoo --group odoo
+
+# preparar pasta de logs
+sudo mkdir /var/log/odoo
+
+#
+sudo npm install -g less less-plugin-clean-css
+sudo ln -s /usr/bin/nodejs /usr/bin/node
+
+# download do Odoo 10
+cd /opt/odoo
+sudo git clone https://github.com/odoo/odoo.git .
+
+
+# instalar dependências
+sudo pip install -r /opt/odoo/doc/requirements.txt
+sudo pip install -r /opt/odoo/requirements.txt
+sudo pip install num2words
+
+
+# wkhtmltopdf (p/ gerar relatórios em pdf)
+# @todo: nao deu certo ainda, rever
+cd /tmp
+wget http://download.gna.org/wkhtmltopdf/0.12/0.12.1/wkhtmltox-0.12.1_linux-trusty-amd64.deb
+sudo dpkg -i wkhtmltox-0.12.1_linux-trusty-amd64.deb
+
+sudo cp /usr/local/bin/wkhtmltopdf /usr/bin
+sudo cp /usr/local/bin/wkhtmltoimage /usr/bin
+
+# Configurando odoo-server.conf
+cp /opt/odoo/debian/odoo.conf /etc/odoo-server.conf
+
+
+##
+## odoo-server
+##
+
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides: odoo-server
+# Required-Start: $remote_fs $syslog
+# Required-Stop: $remote_fs $syslog
+# Should-Start: $network
+# Should-Stop: $network
+# Default-Start: 2 3 4 5
+# Default-Stop: 0 1 6
+# Short-Description: Odoo ERP
+# Description: Odoo is a complete ERP business solution.
+### END INIT INFO
+
+PATH=/bin:/sbin:/usr/bin
+# Change the Odoo source files location according your needs.
+DAEMON=/opt/odoo/odoo-bin
+# Use the name convention of your choice
+NAME=odoo-server
+DESC=odoo-server
+
+# Specify the user name (Default: odoo).
+USER=odoo
+
+# Specify an alternate config file (Default: /etc/odoo-server.conf).
+CONFIGFILE="/etc/odoo-server.conf"
+
+# pidfile
+PIDFILE=/var/run/$NAME.pid
+
+# Additional options that are passed to the Daemon.
+DAEMON_OPTS="-c $CONFIGFILE"
+
+[ -x $DAEMON ] || exit 0
+[ -f $CONFIGFILE ] || exit 0
+
+checkpid() {
+[ -f $PIDFILE ] || return 1
+pid=`cat $PIDFILE`
+[ -d /proc/$pid ] && return 0
+return 1
+}
+
+case "${1}" in
+start)
+echo -n "Starting ${DESC}: "
+
+start-stop-daemon --start --quiet --pidfile ${PIDFILE} \
+--chuid ${USER} --background --make-pidfile \
+--exec ${DAEMON} -- ${DAEMON_OPTS}
+
+echo "${NAME}."
+;;
+
+stop)
+echo -n "Stopping ${DESC}: "
+
+start-stop-daemon --stop --quiet --pidfile ${PIDFILE} \
+--oknodo
+
+echo "${NAME}."
+;;
+
+restart|force-reload)
+echo -n "Restarting ${DESC}: "
+
+start-stop-daemon --stop --quiet --pidfile ${PIDFILE} \
+--oknodo
+
+sleep 1
+
+start-stop-daemon --start --quiet --pidfile ${PIDFILE} \
+--chuid ${USER} --background --make-pidfile \
+--exec ${DAEMON} -- ${DAEMON_OPTS}
+
+echo "${NAME}."
+;;
+
+*)
+N=/etc/init.d/${NAME}
+echo "Usage: ${NAME} {start|stop|restart|force-reload}" >&2
+exit 1
+;;
+esac
+
+exit 0
+
+##
+##
+##
+
+sudo chmod 755 /etc/init.d/odoo-server
+sudo chown root: /etc/init.d/odoo-server
+
+sudo chown -R odoo: /opt/odoo/
+
+sudo chown odoo:root /var/log/odoo
+
+sudo chown odoo: /etc/odoo-server.conf
+sudo chmod 640 /etc/odoo-server.conf
+
+# @todo: informar explicito os branchs (10.0)
+cd /opt/odoo
+sudo git clone https://github.com/OCA/l10n-brazil
+sudo git clone https://github.com/OCA/account-fiscal-rule
+sudo git clone https://github.com/odoo-brazil/odoo-brazil-eletronic-documents
+sudo git clone https://github.com/OCA/server-tools
+
+#
+# Problemas comuns e soluções
+#
